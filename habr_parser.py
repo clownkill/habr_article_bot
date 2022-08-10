@@ -2,16 +2,23 @@ from selenium.webdriver import Chrome, ChromeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
+import gtts
+
+
+def get_article_filename(article_title):
+    return article_title.replace(": ", " ")
 
 
 def save_article(article_title, article_body):
     article = f"{article_title}\n{article_body}"
-    file_name = article_title.replace(": ", " ") + ".txt"
-    print(file_name)
+    file_name = get_article_filename(article_title)
+    text_file_name = file_name + ".txt"
+    audio_file_name = file_name + ".mp3"
 
-    with open(file_name, "w", encoding="utf-8") as f:
+    with open(text_file_name, "w", encoding="utf-8") as f:
         f.write(article)
 
+    gtts.gTTS(text=article_body, lang="ru").save(audio_file_name)
 
 def parse_habr_article(url):
     options = ChromeOptions()
