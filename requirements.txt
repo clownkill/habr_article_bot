@@ -4,3 +4,6 @@ requests==2.28.1
 selenium==4.4.0
 webdriwer-manager==3.8.3
 gTTS==2.2.4
+environs==9.5.0
+python-telegram-bot==13.13
+redis==4.3.4
