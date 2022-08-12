@@ -7,4 +7,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ['python', 'tb_bot.py']
+CMD ['python3', 'tb_bot.py']
