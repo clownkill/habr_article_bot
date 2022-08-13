@@ -1,3 +1,4 @@
+from cgitb import text
 import logging
 import os
 from textwrap import dedent
@@ -6,12 +7,19 @@ from environs import Env
 from telegram import ForceReply
 from telegram.ext import (
     Updater,
+    CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
     Filters,
 )
 
-from habr_parser import parse_habr_article, save_article, get_article_filename
+from habr_parser import (
+    parse_habr_article,
+    save_article,
+    get_article_filename,
+    get_last_articles,
+)
+from keyboard import get_main_menu
 
 
 logging.basicConfig(
@@ -26,34 +34,91 @@ def error(error):
 
 
 def start_command(update, context):
+    global last_articles
+    last_articles = get_last_articles("https://habr.com/ru/all/")
+
     user = update.effective_user
     message_text = f"""Привет, <b>{user.mention_html()}</b>!
-Можешь прислать мне ссылку на статью с <a>habr.com</a>
+Могу прочитать для тебя статью с <i><b>habr.com</b></i>
+Можешь выбрать статью из 20 последних опубликованных ниже
+или прислать мне ссылку на любую статью <i><b>habr.com</b></i>
 и я попробую прочитать ее для тебя"""
-
-    update.message.reply_html(
-        dedent(message_text),
-        reply_markup=ForceReply(selective=True),
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=dedent(message_text),
+        parse_mode="HTML",
+        reply_markup=get_main_menu(last_articles),
+    )
+    context.bot.delete_message(
+        chat_id=update.effective_chat.id, message_id=update.message.message_id
     )
 
 
 def help_command(update, context):
     message_text = """Я умею читать статьи с <i><b>habr.com</b></i>,
 и озвучивать их содержимое для тебя.
-Чтобы получить аудиофайл статьи, пришли мне ссылку на нее
+Чтобы получить аудиофайл статьи, выбери статью ниже или
+пришли мне ссылку на любую статью <i><b>habr.com</b></i>
     """
-    update.message.reply_html(
-        dedent(message_text),
-        reply_markup=ForceReply(selective=True),
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=dedent(message_text),
+        parse_mode="HTML",
+        reply_markup=get_main_menu(last_articles),
+    )
+
+    context.bot.delete_message(
+        chat_id=update.effective_chat.id, message_id=update.message.message_id
     )
 
 
 def get_send_audio_article(update, context):
-    url = update.message.text
+    if query := update.callback_query:
+        if "pag" in query.data:
+            user = update.effective_user
+            message_text = f"""Привет, <b>{user.mention_html()}</b>!
+Могу прочитать для тебя статью с <i><b>habr.com</b></i>
+Можешь выбрать статью из 20 последних опубликованных ниже
+или прислать мне ссылку на любую статью <i><b>habr.com</b></i>
+и я попробую прочитать ее для тебя"""
+            page = query.data.split(", ")[1]
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=dedent(message_text),
+                parse_mode="HTML",
+                reply_markup=get_main_menu(last_articles, int(page)),
+            )
+            context.bot.delete_message(
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id
+            )
+
+        else:
+            url = query.data
+    else:
+        url = update.message.text
     article_title, article_body = parse_habr_article(url)
     filename = get_article_filename(article_title)
 
-    update.message.reply_text("Я уже начал читать статью придется подождать немного")
+    message_text = "Я уже начал читать статью придется подождать немного"
+    if update.callback_query:
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=dedent(message_text),
+        )
+        context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
+        )
+    else:
+        context.bot.send_message(
+            chat_id=update.effective_message.chat_id,
+            text=dedent(message_text),
+        )
+        context.bot.delete_message(
+            chat_id=update.effective_chat.id,
+            message_id=update.effective_message.message_id
+        )
     save_article(article_title, article_body)
 
     with open(filename, "rb") as f:
@@ -88,6 +153,7 @@ def main():
 
     dispatcher.add_handler(CommandHandler("start", start_command))
     dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CallbackQueryHandler(get_send_audio_article))
     dispatcher.add_handler(
         MessageHandler(
             Filters.entity("url") & Filters.regex(r"https:\/\/habr\.com.*"),
