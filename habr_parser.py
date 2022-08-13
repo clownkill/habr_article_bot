@@ -5,6 +5,21 @@ from webdriver_manager.chrome import ChromeDriverManager
 import gtts
 
 
+def get_web_driver():
+    options = ChromeOptions()
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--headless")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--no-sandbox")
+
+    return Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options
+    )
+
+
 def get_article_filename(article_title):
     return article_title.replace(": ", " ") + ".mp3"
 
@@ -17,17 +32,7 @@ def save_article(article_title, article_body):
 
 
 def parse_habr_article(url):
-    options = ChromeOptions()
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option("useAutomationExtension", False)
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--headless")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--no-sandbox")
-    driver = Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
+    driver = get_web_driver()
     driver.get(url)
 
     article_title = driver.find_element(
@@ -43,7 +48,22 @@ def parse_habr_article(url):
     return article_title, article_body
 
 
+def get_last_articles(url):
+    driver = get_web_driver()
+    driver.get(url)
+
+    articles = driver.find_elements(
+        By.CSS_SELECTOR,
+        "a.tm-article-snippet__title-link"
+    )
+
+    last_articles = {
+        article.text: article.get_attribute("href") for article in articles
+    }
+
+    return last_articles
+
+
 if __name__ == "__main__":
-    url = "https://habr.com/ru/post/681798/"
-    article_title, article_body = parse_habr_article(url)
-    save_article(article_title, article_body)
+    url = "https://habr.com/ru/all/"
+    get_last_articles(url)
