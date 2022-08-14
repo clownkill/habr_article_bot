@@ -1,8 +1,13 @@
+from environs import Env
 from selenium.webdriver import Chrome, ChromeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 import gtts
+
+
+env = Env()
+env.read_env()
 
 
 def get_web_driver():
@@ -15,7 +20,7 @@ def get_web_driver():
     options.add_argument("--no-sandbox")
 
     return Chrome(
-        service=Service(ChromeDriverManager().install()),
+        executable_path=env('CHROME_DRIVER_PATH'),
         options=options
     )
 
